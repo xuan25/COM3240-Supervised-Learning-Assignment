@@ -1,0 +1,591 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\pgfplotscreateplotcyclelist{my color list}{black,red,blue,brown,teal,orange,violet,cyan,green!70!black,magenta,gray}
+
+\usepackage{listings}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\begin{titlepage}
+
+    % You need to edit the details here
+
+    \begin{center}
+        {\LARGE University of Sheffield}\\[1.5cm]
+        \linespread{1.2}\huge {\bfseries Assignment 1: Supervised learning of handwritten letters}\\[1.5cm]
+        \linespread{1}
+        \includegraphics[width=5cm]{images/tuoslogo.png}\\[1cm]
+        {\large COM3240 Adaptive Intelligence (SPRING 2020--21)}\\[1cm]
+        {\Large Boxuan Shan}\\[6cm]
+        \large Department of Computer Science\\[1cm]
+        \today
+    \end{center}
+
+\end{titlepage}
+
+\title{Supervised learning of handwritten letters}
+
+\author{\IEEEauthorblockN{Boxuan Shan}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{The University of Sheffield}\\
+Sheffield, UK \\
+bshan3@sheffield.ac.uk}
+}
+
+\maketitle
+
+% Enable pagenumber
+\thispagestyle{plain}
+\pagestyle{plain}
+
+\begin{abstract}
+    Supervised learning is an important branch of machine learning, which refers to the process of adjusting the parameters of a classifier by employing a set of labelled samples to achieve a desired performance. In this report, the performance of different feedforward neural network structures and the effect of different hyperparameters was explored under a ReLU-like activation function. The role of the L1 regularisation penalty in preventing overfitting will also be discussed. The classification target for experimenting was EMNIST Letter dataset.
+\end{abstract}
+
+\begin{IEEEkeywords}
+    Supervised learning, Feedforward neural network, Perceptron, Multilayer neural network
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Supervised learning, typically refers to the optimisation of a classifier on a labelled dataset, where the classes in the dataset are usually labelled by experts. The parameters of the classifier are updated by training in order to minimise the error in classifying the samples in the training set, while expecting it to be able to accurately classify unseen samples. In this assignment, the classifier was a multilayer feedforward neural network for classifying images of handwritten letters. In the supervised learning process, firstly, before training, 3 datasets are usually prepared, which are the training set, the validation set, and the test set. Ideally, each of the classes in the three datasets should have the same distribution to achieve a good training effectiveness. During the training process, the data in the training set needs to be classified with the classifier, and the classification results are compared with the true class of the samples and the error will be calculated. The parameters of the classifier are then updated based on the error. The above training steps are repeated until the classifier achieves a reasonable performance. While training, the validation set will be used to evaluate the performance of the classifier along with epochs and will be used as a evidence to adjust the hyperparameters, such as the number of neural network layers, the number of neurons per layer, the learning rate, the batch size, the penalty coefficient, etc. Finally, at the end of the training, the test set will be used to evaluate the final accuracy of the model.
+
+In this assignment, a classifier model consisting of a multilayer feedforward neural network was constructed, supervised learning was performed on handwritten letters, then the performance of the model was investigated in terms of different hyperparameters. The neural network was built with NumPy package in Python as well as CuPy to speed up the computation. The dataset used in this assignment was a subset of EMNIST Letters dataset~\cite{cohen2017emnist} (1,000 per class from the training set and 250 per class from the testing set).
+
+\section{Methods}
+
+\subsection{Dataset Preprocessing}
+
+EMNIST Letter dataset contains images of 26 types of handwritten letters from A to Z, in both uppercase and lowercase forms, where each image was scaled to 28\({\times}\)28 pixels. The image data was flattened into a set 784-dimensional tensors in order to fed into the neural network. The EMNIST dataset was divided into a training set and a test set only, where the size of the test set was 20\% of all the data. In this assignment, a validation set was also required in order to provides a reference for adjusting the hyperparameters. Therefore a further 20\% of the data set needs to be randomly selected from the training set as the validation set.
+
+\subsection{Forward Propagation}
+
+In the forward propagation, the output \(y_i\) of each layer is
+\begin{eqnarray}
+    h_i &=& \left(\sum_j{w_{ij}x_j}\right)\\
+    y_i &=& f(h_i)
+\end{eqnarray}
+where \(x_j\) is the output of neuron \(j\) from the previous layer, specially, for the input layer, \(x_j\) is the network input. \(w_{ij}\) is the connection weight from neuron \(j\) in the previous layer to neuron \(i\) in the current layer. \(h_i\) is the activation value of neuron \(i\). \(f\) is the activation function. \(y_i\) is the output of neuron \(i\) in the current layer.
+
+\subsection{Error Function}
+
+Based on the output from the forward process on the training set, the classification error \(E\) can be derived. In this assignment, the error was expressed with mean squared error (MSE). It can be defined as
+\begin{equation}
+    E_{MSE}=\frac{1}{2N}\sum_\mu\sum_i\left(y_{\mu,i}-t_{\mu,i}\right)
+\end{equation}
+where \(y_{\mu,i}\) is the output of neuron \(i\) in output layer for sample \({\mu}\). \(y_{\mu,i}\) is the corresponding true reference output. \(N\) is the number of samples in the batch.
+
+In order to prevent the model from overfitting the training data, a penalty term was added to the error and its effect was investigate in the experiment. In this assignment, \(L1\) regularisation penalty was implemented which can be defined as
+\begin{equation}
+    E_{L1} = \lambda_1\sum_l^{N_{\text{layers}}}\sum_{ij}\left|w_{ij}^{(l)}\right|
+\end{equation}
+where \({\lambda_1}\) is a hyperparameter which is a small penalty factor. \(w_{ij}^{(l)}\) represents the connection weight form neuron \(j\) in layer \(l-1\) to neuron \(i\) in layer \(l\).
+
+Furthermore, the \(L1\) regularisation penalty will tend to obtain a sparse model, that is, most of the weights will be zero, which makes the model more interpretable~\cite{schmidt2005least}.
+
+Therefore, in this assignment, the complete error function can be defined as
+\begin{equation}
+    E = E_{MSE} + E_{L1}
+\end{equation}
+
+The value of \({\lambda_1}\) was set to 0 initially in the experiment, which is equivalent to not introduce the L1 regularisation penalty.
+
+\subsection{Backpropagation}
+
+After calculating the error, the error was backpropagated to calculate the gradient of each weight for the neuron connections. The weights are then updated according to the error, the gradient and the learning rate, this is also called gradient descent. The weight update was defined as
+\begin{equation}
+    \Delta w_{ij}^{(k)} = \Delta w_{ij,MSE}^{(k)}+\Delta w_{ij,L1}^{(k)}
+\end{equation}
+where \(\Delta w_{ij}^{(k)}\) is the weight of the connection form neuron \(j\) in layer \(k-1\) to neuron \(i\) in layer \(k\). \(\Delta w_{ij,MSE}^{(k)}\) and \(\Delta w_{ij,L1}^{(k)}\) are weight updates based on the MSE error and the \(L1\) penalty respectively.
+
+\subsubsection{Weight update based on MSE}
+
+The definition of weight update based on MSE \(\Delta w_{ij,MSE}^{(k)}\) is known to be
+\begin{equation}
+    \Delta w_{ij,MSE}^{(k)} = -\eta\frac{1}{N}\sum_\mu\delta^{(k)}_{\mu,j}x^{(k-1)}_{\mu,l}
+\end{equation}
+
+For the output layer,
+\begin{equation}
+    \delta_{\mu,j}^{(k)}=f^{'}\left(h^{(k)}_{\mu,j}\right)\left(y_{\mu,j}-t_{\mu,j}\right)
+\end{equation}
+
+For other layers,
+\begin{equation}
+    \delta_{\mu,j}^{(k)}=f^{'}\left(h^{(k)}_{\mu,j}\right)\sum_i\delta^{(k+1)}_{\mu,i}w^{(k+1)}_{ij}
+\end{equation}
+
+where \({\eta}\) is the learning rate, \(w^{(k)}_{ij}\) is the weight of connection from neuron \(i\) in layer \(k-1\) to neuron \(j\) in layer \(k\), \(h^{(k)}_{\mu,j}\) is the activation value of neuron \(j\) in layer \(k\) for sample \({\mu}\). \(y_{\mu,j}\) is the output of neuron \(j\) in the output layer for sample \({\mu}\), and \(t_{\mu,j}\) is the corresponding true reference output.
+
+To simplify, the learning rate \({\eta}\) will be set to 0.05 in subsequent experiments.
+
+\subsubsection{Weight update based on \(L1\)}
+
+The definition of weight update based on L1 regularisation penalty \(\Delta w_{ij,L1}^{(k)}\) is defined as
+
+\begin{equation}
+    \Delta w_{ij,L1}^{(k)} = -\eta\frac{\delta E_{L1}}{\delta w^{(k)}_{ij}}
+\end{equation}
+
+By derivation, the derivative of \(E_{L1}\) with respect to \(w_{ij}^{(k)}\) can be obtained. For simplicity, we define the absolute function as
+
+\begin{equation}
+    \left|w\right|=\sqrt{w^2}
+\end{equation}
+
+Thus,
+
+\begin{eqnarray}
+    \frac{\delta E_{L1}}{\delta w_{ij}^{(k)}}
+    &=& \frac{\delta}{\delta w_{ij}^{(k)}} \lambda_1\sum_l^{N_\text{layers}}\sum_{mn}\left|w_{mn}^{(l)}\right|
+    \\
+    &=&  \lambda_1\sum_l^{N_\text{layers}}\sum_{mn}\frac{\delta}{\delta w_{ij}^{(k)}}\sqrt{{\left(w_{mn}^{(l)}\right)}^2}
+    \\
+    &=& \lambda_1\frac{w_{ij}^{(l)}}{\sqrt{{\left( w_{ij}^{(l)}\right)}^2}}
+    \\
+    &=& \lambda_1\frac{w_{ij}^{(k)}}{\left|w_{ij}^{(k)}\right|}
+\end{eqnarray}
+
+Therefore,
+
+\begin{equation}
+    \Delta w_{ij,L1}^{(k)} = -\eta\lambda_1\frac{w_{ij}^{(k)}}{\left|w_{ij}^{(k)}\right|}
+\end{equation}
+
+\subsection{Activation Function}
+
+In this assignment, the activation function of the neural network was Leaky ReLU, a variant of Rectified Linear Unit (ReLU)~\cite{krizhevsky2012imagenet}, which is a segmentation function. The reasons for this chosen will be explained later.
+
+The typical ReLU can be expressed as
+
+\begin{equation}
+    f(x)=
+    \begin{cases}
+        x& \text{if }x>0\\
+        0& \text{if }x\leq0
+    \end{cases}
+\end{equation}
+
+Therefore, its gradient can be defined as
+
+\begin{equation}
+    f^{'}(x)=
+    \begin{cases}
+        1& \text{if }x>0\\
+        0& \text{if }x<0
+    \end{cases}
+\end{equation}
+
+This is a non-saturated nonlinear activation function, where non-saturation implies that the value domain is not compressed to a specific range. Compared to saturated non-linear activation functions such as sigmoid, training with ReLU will lead to much faster convergence speed, benefiting from its large gradient over a wide range of the positive part of the axis. Meanwhile, in multilayer neural networks, the range with smaller gradients in the sigmoid function may also lead to the vanishing gradient problem~\cite{hochreiter2001gradient}, where the gradient decreases exponentially with the number of layers during the backpropagation. This leads to a slower training of the layers in the front-end, which can be solved by the fact that the gradient of ReLU is always 1 in the positive part of the axis.
+
+However, ReLU still suffers from the ``Dying ReLU'' problem, that is, if the sum of inputs to a neuron is always negative during the training, thus the gradient of the activation function will be zero, resulting in the relevant weights will not be updated during the gradient descent. This may occur when the learning rate is set to a large value and the error is high, since some weights may be shifted a significant distance in the negative direction on update. In addition, ReLU is not zero-centred function, which has an impact on the dynamics during gradient descent and thus slow down the convergence~\cite{deep2021}.
+
+Leaky ReLU solves the ``Dying ReLU'' problem by adding a small gradient to the negative part of the axis, which avoids the zero-gradient problem and allows the weights to be updated. It can be defined as
+
+\begin{equation}
+    f(x)=
+    \begin{cases}
+        x& \text{if }x>0\\
+        ax& \text{if }x\leq0
+    \end{cases}
+\end{equation}
+
+where \(a\) is a very small coefficient (e.g. 0.01). Its gradient can be then defined as
+
+\begin{equation}
+    f^{'}(x)=
+    \begin{cases}
+        1& \text{if }x>0\\
+        a& \text{if }x<0
+    \end{cases}
+\end{equation}
+
+Experiment by He shows that Leaky ReLU has negligible effect on accuracy compared to ReLU~\cite{he2015delving}. Although the effect on accuracy of Leaky ReLU was negligible compared to ReLU in He's experiments, Leaky ReLU was found to improve accuracy to some extent in this experiment (Appendix~\ref{app:leaky}, Figure~\ref{fig:leaky-0.05}). Meanwhile, since there is no ``Dying ReLU'' problem, the learning rate can be increased safely to get a faster convergence rate (Appendix~\ref{app:leaky}, Figure~\ref{fig:leaky-0.3}). Due to the time constraints of this assignment, a lower training time is expected. Therefore, Leaky ReLU was taken as the activation function in this assignment to reduce training time. The coefficient \(a\) in the Leaky ReLU was set to 0.01. 
+
+In addition, due to the small gradient of the negative part of the Leaky Relu, over-reliance on the ``Leaky'' features can also detrimental to the training speed. Therefore, a appropriate weight initialisation and inputs normalisation methods can be used to minimise the initial error~\cite{he2015delving}, thus prevent the weights from getting a large negative update at the beginning. These will be discussed in more detail in following sections.
+
+\subsection{Training Approaches}
+
+During training, weights are usually updated in three approaches: online, mini-batch and full batch training. Online training refers to performing weight updates for each sample, which allows for fast weight updates thus accelerating training, however, individual samples can have a large impact on the weights, leading to unstable training. Full batch training will calculate the average error and gradient of the whole training set and then update the weights based on it, which will gives a more accurate error and gradient, however, the training speed will be much slower. Mini-batch training is a compromised way that divides the entire training set into multiple batches and updates the weights after each batch to obtain a good estimation of the gradient and a fast weight updates. Batch size refers to the number of samples in each batch. When the batch size is equal to one, it is equivalent to the online training, and when the batch size is equal to the size of the training set, it is equivalent to the full batch training. When all the data in the training set has been used once for weight update, this is called an epoch.
+
+In this experiment, mini-batch training was be used, with a batch size of 50.
+
+\subsection{Weight Initialisation}
+
+Before the beginning of training, weights need to be initialised. He implies that poor initialisation of weights may hamper the training~\cite{he2015delving}. In this assignment, He weight initialization\cite{he2015delving} was implemented. The He initialization is similar to the Xavier initialization~\cite{glorot2010understanding}, which is derived with the assumption of a linear activation function, while the He initialization is derived with the assumption of a ReLU activation function. He suggested that the initial weights should conform to
+
+\begin{equation}
+    \frac{1}{2}n_l \textrm{Var}[w_l] = 1,\quad \forall l
+\end{equation}
+
+Where \(l\) index the layers in the neural network, \(n_l\) is the number of inputs for layer \(l\), and \(w_l\) is the weight matrix of layer \(l\). This will result in a zero-mean Gaussian distribution with a standard deviation of \(\sqrt{2/n_l}\). He also suggests that the weight for biases should be initialised to zero.
+
+\subsection{Input Normalization}
+
+The inputs to the model need to be normalised, which will hopefully allows the model to focus more on the probability distribution of the features rather than the values themselves. Since the input in this assignment is sparse, for example at the edges of the image, and in the middle where there is no stroke, the tensor value corresponding to that pixel is 0. The model is expected to focus on the parts of the image that have stroke on them and thus needs to retain the sparsity of the data. Therefore, the data was not centralised in the normalisation process, but simply restricted the absolute value of the data between 0 and 1. Since the samples in the EMNIST dataset has already been standardised and compressing the value range to 0--255, in this assignment, normalisation was simplified to multiplying the original values by a constant factor.
+
+\subsection{Average Weighting Update}
+
+During training, the dynamics of the weights in each epoch was monitored with average weight updates. When the model converges, the sum of the average weight update should be close to zero. The weight update matrix \(A_{n}\) for batch \(n\) can be defined as
+
+\begin{equation}
+    A_{n}=
+    \begin{cases}
+        \Delta w_1 &\text{for }n=1\\
+        A_{n-1}(1-\tau)+\tau\Delta w_{n} &\text{for }n>1\\
+    \end{cases}
+\end{equation}
+
+where \(\Delta w_{n}\) is the weight update for the batch \(n\) and \({\tau}\) is a very small constant. In this assignment, the value of \({\tau}\) was set to 0.001.
+
+\section{Results and Discussion}
+
+\subsection{Convergence}
+
+In this section, a single-layer neural network (Perceptron) was constructed to test whether the model converges before starting to experiment with a multi-layer neural network. If the model converges, the sum of the average weight updates should gradually approach to zero during the training process.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Sum of Average Weight Updates},
+                    legend pos=north west,
+                    grid=both,
+                    grid style=dashed,
+                ]
+                \addplot+[mark=x] table [x=epoch, y=average_weight_update, col sep=comma] {data/baseline/0.csv};
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Sum of Average Weight Updates vs Epochs}\label{fig:WeightUpdate}
+\end{figure}
+
+The experimental results are shown in the Figure~\ref{fig:WeightUpdate}. It is clear that the sum of the average weight updates gradually approaches to zero as the training epoch increases, and it eventually lingers around zero. This implies that our neural network model can converge properly.
+
+\subsection{Single Layer Network}
+
+To obtain a baseline for the classification performance of our neural network model, 250 epochs were trained on this single-layer feedforward neural network. The accuracy on the validation set was traced during the training process. After training, the accuracy of the neural network was evaluated on the test set.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Validation Accuracy [\(\%\)]},
+                    legend pos=north west,
+                    grid=both,
+                    grid style=dashed,
+                ]
+                \addplot+[mark=x] table [x=epoch, y=valid_accuracy, col sep=comma] {data/baseline/0.csv};
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Validation Accuracy vs Epochs for single layer network}\label{fig:single_acc}
+\end{figure}
+
+The results of the performance trace are shown in the Figure~\ref{fig:single_acc}. The final accuracy of the network was 68.40\% on the validation set and 67.46\% on the test set. This result was better than the accuracy of the linear classifier experiment by Gregory, which was 55.78\%~\cite{cohen2017emnist}. This confirms that our neural network model is feasible.
+
+\subsection{\(L1\) Regularisation Penalty}
+
+\({\lambda_1}\) is a hyperparameter of the \(L1\) regularisation penalty. In this section, the effect of \({\lambda_1}\) was experimented in a feedforward neural network containing a hidden layer of 50 neurons. The neural network was trained with different \({\lambda_1}\) and the validation error and validation accuracy has been plotted.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Validation Error [\(\%\)]},
+                    ymin=0.15, ymax=0.5,
+                    legend pos=north east,
+                    grid=both,
+                    grid style=dashed,
+                    cycle list name=my color list
+                ]
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_error, col sep=comma] {data/l1/0.csv};
+                \addlegendentry{\(\lambda_1 = 0\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_error, col sep=comma] {data/l1/1.0e-9.csv};
+                \addlegendentry{\(\lambda_1 = 1\times10^{-5}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_error, col sep=comma] {data/l1/5.0e-5.csv};
+                \addlegendentry{\(\lambda_1 = 5\times10^{-5}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_error, col sep=comma] {data/l1/1.0e-4.csv};
+                \addlegendentry{\(\lambda_1 = 1\times10^{-4}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_error, col sep=comma] {data/l1/5.0e-4.csv};
+                \addlegendentry{\(\lambda_1 = 5\times10^{-4}\)}
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Validation Error vs Epochs with different \(\lambda_1\)}\label{fig:valid_err_vs_epo}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Validation Accuracy [\(\%\)]},
+                    ymin=60, ymax=85,
+                    legend pos=south east,
+                    grid=both,
+                    grid style=dashed,
+                    cycle list name=my color list
+                ]
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_accuracy, col sep=comma] {data/l1/0.csv};
+                \addlegendentry{\(\lambda_1 = 0\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_accuracy, col sep=comma] {data/l1/1.0e-9.csv};
+                \addlegendentry{\(\lambda_1 = 1\times10^{-5}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_accuracy, col sep=comma] {data/l1/5.0e-5.csv};
+                \addlegendentry{\(\lambda_1 = 5\times10^{-5}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_accuracy, col sep=comma] {data/l1/1.0e-4.csv};
+                \addlegendentry{\(\lambda_1 = 1\times10^{-4}\)}
+                \addplot+[mark=none, opacity=0.8] table [x=epoch, y=valid_accuracy, col sep=comma] {data/l1/5.0e-4.csv};
+                \addlegendentry{\(\lambda_1 = 5\times10^{-4}\)}
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Validation Accuracy vs Epochs with different \(\lambda_1\)}\label{fig:valid_acc_vs_epo}
+\end{figure}
+
+From Figure~\ref{fig:valid_err_vs_epo} and Figure~\ref{fig:valid_acc_vs_epo}, when \(L1\) penalty was not introduced (\(\lambda_1=0\)), the neural network achieves performance when it is trained about 100 epochs, then the performance start to decline. This may due to the neural network was starting to overfit with the training set, where it start to learns the noise in the training set, thus making the model less generalizable. Instead, when \(\lambda_1\) is set to \(1\times10^{-4}\), the network has higher accuracy than the baseline (\(\lambda_1=0\)) at epoch 500, while its performance continues to exhibit an increasing trend. This suggests that the penalty term in the error can mitigate the overfitting problem, thus improving the accuracy of the model in classifying on unseen samples. However, when the value of \({\lambda_1}\) is not appropriate, e.g. \(\lambda_1 = 5\times10^{-4}\), the penalty term can significantly reduces the convergence speed, which makes the network require more training time to achieve a reasonable performance.
+
+To prevent the performance impact from overfitting problems, in subsequent experiments, \(\lambda_1\) will be set to \(1\times10^{-4}\).
+
+Besides adding a penalty term, overfitting can also be prevented by early stopping~\cite{prechelt1998early}. This approach estimates the likelihood of overfitting by defining a function. Then the training will be stopped when the model starts to overfit in order to get the best accuracy while costing minimal time. Another method to prevent overfitting is Dropout~\cite{hinton2012improving}, which prevents co-adaptation by randomly removing some neurons during training.
+
+\subsection{Number of Neurons in the Hidden Layer}
+
+The hidden layer can transform the input tensor into other dimensions, in which the neurons of the hidden layer expect to abstract features from the inputs. In general, a layer containing more neurons is expected to abstract more features from the layer input, which can lead to better classification results. Therefore, the effect of different neuron numbers in the hidden layer was experimented in this section. For each set of parameters, training was repeated 10 times, then the average and the standard deviation of the testing accuracy was calculated.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                xlabel={Number of Neurons in the Hidden Layer},
+                ylabel={Test Accuracy [\(\%\)]},
+                grid=both,
+                grid style=dashed,
+                legend pos=north west,
+                legend style={draw=none}]
+              \addplot+[
+                mark=x, 
+                error bars/.cd, 
+                  y fixed,
+                  y dir=both, 
+                  y explicit
+              ] table [x=x, y=y, y error=std, col sep=comma] {data/num_neuron/plot.csv};
+              \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Test Accuracy vs Size of Hidden Layer}\label{fig:acc_single}
+\end{figure}
+
+A total of 7 sets of neuron numbers were experimented, which were 10, 50, 100, 150, 250, 400 and 800 neurons and were trained for 250 epochs each. The results are shown in the Figure~\ref{fig:acc_single}. It is clear that as the number of neurons in the hidden layer increases, the accuracy of the model improves. By 800 neurons, the classification accuracy reached to 84.52\%±0.44\%. Gregory obtained an even higher accuracy of 85.15\%±0.12\% by using a single hidden layer network with 10,000 neurons in the hidden layer~\cite{cohen2017emnist}. This indicates that for a neural network with single hidden layer, more neurons in the hidden layer can obtain a better capability to extract features from the input and then perform better classification. However, it is noticeable that the number of neurons and the accuracy are not linearly related, as the number of neurons increases, the increase in the accuracy becomes slower.
+
+\subsection{Deeper Neural Network}
+
+For some problems, a single hidden layer network may not be able to handled. For example, Ronen et al.\ devised a function that can be represented by a small 3-layer feedforward network but not by an arbitrary 2-layer network~\cite{eldan2016power}. Thus, for certain problems, a deep neural networks are necessary. However, this does not indicate that deeper networks always better. As the number of layers in a network increases, training the network can becomes more difficult~\cite{glorot2010understanding}. Furthermore, Zhou stated that all Lebesgue-integrable functions cannot be approximated by a ReLU network with a width smaller than a specific value~\cite{lu2017expressive}, which suggests that a certain width of the neural network is also necessary.
+
+In this section, a hidden layer was added to the single hidden layer network to build a deeper neural network and experiments are conducted to compare the performance with the single hidden layer network with the previous section. Where the number of neurons in the first hidden layer \(N^{(1)}\) was set to a constant value 100 and different numbers of neurons in the second hidden layer was tested. For each set of parameters, training was repeated 10 times, then the mean and the standard deviation of the testing accuracy was calculated.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}[scale = 0.7]
+            \begin{axis}[
+                xlabel={Number of Neurons in the last Hidden Layer},
+                ylabel={Test Accuracy [\(\%\)]},
+                grid=both,
+                grid style=dashed,
+                legend pos=south east,
+                legend style={draw=none}]
+              \addplot+[
+                mark=x, 
+                error bars/.cd, 
+                  y fixed,
+                  y dir=both,
+                  y explicit
+              ] table [x=x, y=y, y error=std, col sep=comma] {data/num_neuron/plot.csv};
+              \addlegendentry{1 hidden layer}
+              \addplot+[
+                mark=x, 
+                error bars/.cd, 
+                  y fixed,
+                  y dir=both,
+                  y explicit
+              ] table [x=x, y=y, y error=std, col sep=comma] {data/deep_layer/plot.csv};
+              \addlegendentry{2 hidden layers (\(N^{(1)}=100\))}
+              \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Test Accuracy vs Size of the last Hidden Layer}\label{fig:acc_deep}
+\end{figure}
+
+In Figure~\ref{fig:acc_deep}, the test accuracy of the neural network with two hidden layers was compared with the neural network with single hidden layer in the previous section. It can be obtained that the accuracy of the neural network with two hidden layers was slightly higher. This may due to the first layer of 100 neurons abstracted the input features to a certain extend, alleviating the difficulty of learning the features by the second layer. Therefore a better performance can be obtained.
+
+\bibliographystyle{IEEEtran}
+\bibliography{bibliography}
+
+\onecolumn
+\appendices{}
+
+\section{Validation Error vs Epochs with different Activation Functions}\label{app:leaky}
+
+Trained on a single hidden layer network with 50 neurons. Leaning rate was set to 0.05. Batch size was set to 50.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Validation Error [\(\%\)]},
+                    legend pos=south east,
+                    grid=both,
+                    grid style=dashed,
+                ]
+                \addplot+[mark=none] table [x=epoch, y=valid_accuracy, col sep=comma] {data/leaky/no-leaky-0.05.csv};
+                \addlegendentry{ReLU}
+                \addplot+[mark=none] table [x=epoch, y=valid_accuracy, col sep=comma] {data/leaky/leaky-0.05.csv};
+                \addlegendentry{Leaky ReLU}
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Validation Error vs Epochs with different Activation Functions (\(\eta=0.05\))}\label{fig:leaky-0.05}
+\end{figure}
+
+Trained on a single hidden layer network with 50 neurons. Leaning rate was set to 0.3. Batch size was set to 50.
+
+\begin{figure}[htbp]
+    \centerline{
+        \begin{tikzpicture}
+            \begin{axis}[
+                    title={},
+                    xlabel={Epochs},
+                    ylabel={Validation Error [\(\%\)]},
+                    legend pos=south east,
+                    grid=both,
+                    grid style=dashed,
+                    ymin = -20
+                ]
+                \addplot+[mark=none] table [x=epoch, y=valid_accuracy, col sep=comma] {data/leaky/no-leaky-0.3.csv};
+                \addlegendentry{ReLU}
+                \addplot+[mark=none] table [x=epoch, y=valid_accuracy, col sep=comma] {data/leaky/leaky-0.3.csv};
+                \addlegendentry{Leaky ReLU}
+            \end{axis}
+        \end{tikzpicture}
+    }
+    \caption{Validation Error vs Epochs with different Activation Functions (\(\eta=0.3\))}\label{fig:leaky-0.3}
+\end{figure}
+
+\section{Implementation of Leaky ReLU}
+
+\begin{lstlisting}[language=Python]
+# lambda for leaky ReLU [0,1]
+a_leaky = 0.01
+
+# activation function
+def activation_func(x):
+    return x * (x > 0) + a_leaky * x * (x <= 0) # Leaky ReLU
+
+# gradient of activation function 
+def grad_activation_func(x):
+    return 1 * (x > 0) + a_leaky * (x <= 0) # Leaky ReLU grad
+
+\end{lstlisting}
+
+\section{Implementation of L1 regularisation penalty}
+
+\begin{lstlisting}[language=Python]
+# L1 regularisation penalty
+# w_list_all is a list of all the weight matrix in the network
+# return a scalar
+def l1_penalty(lambda_1, w_list_all):
+    sum_abs = 0
+    for w in w_list_all:
+        sum_abs += np.sum(np.abs(w))
+    l1_pen = lambda_1 * sum_abs
+    return l1_pen
+
+# gradient of L1 regularisation penalty
+# w is a weight matrix
+# return a matrix
+def grad_l1_penalty(lambda_1, w):
+    grad_l1_pen = w / np.abs(w)
+    grad_l1_pen[np.isnan(grad_l1_pen)] = 0
+    grad_l1_pen = lambda_1 * grad_l1_pen
+    return grad_l1_pen
+
+\end{lstlisting}
+
+\section{Implementation of He weight initialization}
+
+\begin{lstlisting}[language=Python]
+# define the size of input & output layers 
+n_input_layer = img_size
+n_output_layer = n_labels
+
+# Initialize network parameters
+if n_hidden_layer1 > 0:
+    W1 = np.random.randn(n_input_layer, n_hidden_layer1) * np.sqrt(2 / n_input_layer)
+    if n_hidden_layer2 > 0:
+        W2 = np.random.randn(n_hidden_layer1, n_hidden_layer2) * np.sqrt(2 / n_hidden_layer1)
+        W3 = np.random.randn(n_hidden_layer2, n_output_layer) * np.sqrt(2 / n_hidden_layer2)
+    else:
+        W2 = np.random.randn(n_hidden_layer1, n_output_layer) * np.sqrt(2 / n_hidden_layer1)
+else:
+    W1 = np.random.randn(n_input_layer, n_output_layer) * np.sqrt(2 / n_input_layer)
+
+# Initialize the biases
+if n_hidden_layer1 > 0:
+    W1_bias = np.zeros((n_hidden_layer1,))
+    if n_hidden_layer2 > 0:   
+        W2_bias=np.zeros((n_hidden_layer2,))
+        W3_bias=np.zeros((n_output_layer,))
+    else:
+        W2_bias = np.zeros((n_output_layer,))
+else:
+    W1_bias = np.zeros((n_output_layer,))
+
+\end{lstlisting}
+
+
+
+\end{document}
